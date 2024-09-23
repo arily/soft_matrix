@@ -18,6 +18,7 @@ pub struct Options {
     pub minimum_steered_amplitude: f32,
     pub keep_awake: bool,
     pub loud: bool,
+    pub requested_fft_size: Option<usize>,
 
     // Performs additional adjustments according to the specific chosen matrix
     // SQ, QS, RM, ect
@@ -71,6 +72,8 @@ impl Options {
 
         let mut loud: Option<bool> = None;
 
+        let mut fft_size: Option<usize> = None;
+
         // Iterate through the options
         // -channels
         // 4 or 5 or 5.1
@@ -79,7 +82,28 @@ impl Options {
             match args_iter.next() {
                 Some(flag) => {
                     // Parse a flag
-                    if flag.eq("-channels") {
+                    if flag.eq("-fft_size") {
+                        match args_iter.next() {
+                            Some(f_size_string) => match f_size_string.parse::<usize>() {
+                                Ok(size) => {
+                                    if size < 6 {
+                                        println!("fft size must >= 6: {}", size);
+                                        return None;
+                                    }
+
+                                    fft_size = Some(size)
+                                }
+                                Err(_) => {
+                                    println!("fft size must be an integer: {}", f_size_string);
+                                    return None;
+                                }
+                            },
+                            None => {
+                                println!("fft size unspecified");
+                                return None;
+                            }
+                        }
+                    } else if flag.eq("-channels") {
                         match args_iter.next() {
                             Some(channels_string) => {
                                 if channels_string.eq("4") {
@@ -294,6 +318,7 @@ impl Options {
                         minimum_steered_amplitude,
                         keep_awake,
                         loud,
+                        requested_fft_size: fft_size,
                     });
                 }
             }

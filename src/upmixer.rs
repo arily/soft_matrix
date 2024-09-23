@@ -61,7 +61,10 @@ pub fn upmix<TReader: 'static + Read + Seek>(
 
     let min_window_size =
         ((source_wav_reader.sample_rate() as f32) / options.low_frequency).ceil() as usize;
-    let mut window_size = get_ideal_window_size(min_window_size)?;
+    let mut window_size = match options.requested_fft_size {
+        Some(size) => get_ideal_window_size(size)?,
+        None => get_ideal_window_size(min_window_size)?,
+    };
 
     println!(
         "Lowest frequency: {}hz. With input at {} samples / second, using an optimized window size of {} samples",
