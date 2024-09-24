@@ -482,6 +482,8 @@ impl PannerAndWriter {
         lfe: &Option<Vec<Complex<f32>>>,
         center: &Option<Vec<Complex<f32>>>,
     ) -> Result<()> {
+        let gain = db_to_amplitude(0f32 - upmixer.options.headroom.unwrap_or(0.0));
+
         let mut writer_state = self
             .writer_state
             .lock()
@@ -503,10 +505,10 @@ impl PannerAndWriter {
         };
 
         let mut samples_by_channel = SamplesByChannel::new()
-            .front_left(upmixer.scale * left_front_sample)
-            .front_right(upmixer.scale * right_front_sample)
-            .back_left(upmixer.scale * left_rear_sample)
-            .back_right(upmixer.scale * right_rear_sample);
+            .front_left((upmixer.scale * left_front_sample * gain) as f32)
+            .front_right((upmixer.scale * right_front_sample * gain) as f32)
+            .back_left((upmixer.scale * left_rear_sample * gain) as f32)
+            .back_right((upmixer.scale * right_rear_sample * gain) as f32);
 
         match lfe_sample {
             Some(lfe_sample) => {

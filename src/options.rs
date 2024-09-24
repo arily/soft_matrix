@@ -19,6 +19,7 @@ pub struct Options {
     pub keep_awake: bool,
     pub loud: bool,
     pub requested_fft_size: Option<usize>,
+    pub headroom: Option<f32>,
 
     // Performs additional adjustments according to the specific chosen matrix
     // SQ, QS, RM, ect
@@ -74,6 +75,8 @@ impl Options {
 
         let mut fft_size: Option<usize> = None;
 
+        let mut headroom = Some(-24f32);
+
         // Iterate through the options
         // -channels
         // 4 or 5 or 5.1
@@ -95,6 +98,28 @@ impl Options {
                                 }
                                 Err(_) => {
                                     println!("fft size must be an integer: {}", f_size_string);
+                                    return None;
+                                }
+                            },
+                            None => {
+                                println!("fft size unspecified");
+                                return None;
+                            }
+                        }
+                    } else if flag.eq("-headroom") {
+                        match args_iter.next() {
+                            Some(f_size_string) => match f_size_string.parse::<f32>() {
+                                Ok(head) => {
+                                    println!("headroom: {}", head);
+                                    if head < 0f32 {
+                                        println!("headroom must >= 0: {}", head);
+                                        return None;
+                                    }
+
+                                    headroom = Some(0f32 - head)
+                                }
+                                Err(_) => {
+                                    println!("headroom must be an number: {}", f_size_string);
                                     return None;
                                 }
                             },
@@ -319,9 +344,17 @@ impl Options {
                         keep_awake,
                         loud,
                         requested_fft_size: fft_size,
+                        headroom,
                     });
                 }
             }
         }
     }
+}
+pub fn amplitude_to_db(amplitude: f32) -> f32 {
+    return 20.0 * amplitude.log10();
+}
+
+pub fn db_to_amplitude(db: f32) -> f32 {
+    return 10.0f32.powf(db / 20.0);
 }

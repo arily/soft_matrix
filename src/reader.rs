@@ -167,14 +167,17 @@ impl Reader {
 
 impl OpenWavReaderAndBuffer {
     fn queue_next_sample(&mut self, options: &Options) -> Result<()> {
+        let headroom = db_to_amplitude(options.headroom.unwrap_or(0.0));
         match self.stream_wav_reader_iterator.next() {
             Some(samples_result) => {
                 let samples = samples_result?;
 
-                let front_left = samples.front_left.expect("front_left missing when reading");
+                let front_left =
+                    samples.front_left.expect("front_left missing when reading") * headroom;
                 let front_right = samples
                     .front_right
-                    .expect("front_right missing when reading");
+                    .expect("front_right missing when reading")
+                    * headroom;
 
                 self.left_buffer.push_back(Complex {
                     re: front_left,
