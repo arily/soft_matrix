@@ -1,20 +1,20 @@
 use std::{
     collections::VecDeque,
-    f32::consts::PI,
+    f64::consts::PI,
     io::Result,
     sync::{Arc, Mutex},
 };
 
-pub const LFE_START: f32 = 40.0;
-const LFE_FULL: f32 = 20.0;
-const HALF_PI: f32 = PI / 2.0;
+pub const LFE_START: f64 = 40.0;
+const LFE_FULL: f64 = 20.0;
+const HALF_PI: f64 = PI / 2.0;
 
 use rustfft::{num_complex::Complex, Fft};
 use wave_stream::{samples_by_channel::SamplesByChannel, wave_writer::RandomAccessWavWriter};
 
 use crate::{
     matrix,
-    options::Options,
+    options::{db_to_amplitude, Options},
     structs::{ThreadState, TransformedWindowAndPans},
     upmixer::Upmixer,
 };
@@ -26,9 +26,9 @@ pub struct PannerAndWriter {
     // Wav writer and state used to communicate status
     writer_state: Mutex<WriterState>,
 
-    fft_inverse: Arc<dyn Fft<f32>>,
+    fft_inverse: Arc<dyn Fft<f64>>,
 
-    lfe_levels: Option<Vec<f32>>,
+    lfe_levels: Option<Vec<f64>>,
 
     max_samples_in_file: usize,
 }
@@ -45,27 +45,27 @@ impl PannerAndWriter {
         window_size: usize,
         sample_rate: usize,
         target_random_access_wav_writers: Vec<RandomAccessWavWriter<f32>>,
-        fft_inverse: Arc<dyn Fft<f32>>,
+        fft_inverse: Arc<dyn Fft<f64>>,
         max_samples_in_file: usize,
     ) -> PannerAndWriter {
         let lfe_levels = if options.channels.low_frequency {
-            let mut lfe_levels = vec![0.0f32; window_size];
+            let mut lfe_levels = vec![0.0f64; window_size];
             let window_midpoint = window_size / 2;
 
-            let sample_rate_f32 = sample_rate as f32;
-            let window_size_f32 = window_size as f32;
+            let sample_rate_f64 = sample_rate as f64;
+            let window_size_f64 = window_size as f64;
 
             lfe_levels[0] = 1.0;
             lfe_levels[window_midpoint] = 0.0;
 
             // Calculate ranges for averaging each sub frequency
             for transform_index in 1..(window_midpoint - 2) {
-                let transform_index_f32 = transform_index as f32;
+                let transform_index_f64 = transform_index as f64;
                 // Out of 8
                 // 1, 2, 3, 4
                 // 8, 4, 2, 1
-                let wavelength = window_size_f32 / transform_index_f32;
-                let frequency = sample_rate_f32 / wavelength;
+                let wavelength = window_size_f64 / transform_index_f64;
+                let frequency = sample_rate_f64 / wavelength;
 
                 let level = if frequency < LFE_FULL {
                     1.0
@@ -159,8 +159,8 @@ impl PannerAndWriter {
             };
 
             // Ultra-lows are not shitfted
-            left_rear[0] = Complex { re: 0f32, im: 0f32 };
-            right_rear[0] = Complex { re: 0f32, im: 0f32 };
+            left_rear[0] = Complex { re: 0f64, im: 0f64 };
+            right_rear[0] = Complex { re: 0f64, im: 0f64 };
 
             // Steer each frequency
             for freq_ctr in 1..(thread_state.upmixer.window_midpoint + 1) {
@@ -181,13 +181,13 @@ impl PannerAndWriter {
                 // much steering to the rear
                 //thread_state.upmixer.options.matrix.widen(&mut back_to_front, &mut left_to_right);
 
-                let front_to_back = 1f32 - back_to_front;
+                let front_to_back = 1f64 - back_to_front;
 
                 // Figure out the amplitudes for front and rear
-                let mut left_front_amplitude: f32;
-                let left_rear_amplitude: f32;
-                let mut right_front_amplitude: f32;
-                let right_rear_amplitude: f32;
+                let mut left_front_amplitude: f64;
+                let left_rear_amplitude: f64;
+                let mut right_front_amplitude: f64;
+                let right_rear_amplitude: f64;
 
                 // sq requires oddbal adjustment of right-left panning
                 if thread_state.upmixer.options.matrix.steer_right_left() {
@@ -221,7 +221,7 @@ impl PannerAndWriter {
                                 print!("");
                             }*/
 
-                            let center_amplitude: f32;
+                            let center_amplitude: f64;
                             // Adjust the left and right channels
                             if left_to_right == 0.0 {
                                 // Frequency is center-panned
@@ -289,7 +289,7 @@ impl PannerAndWriter {
                     let amplitude_adjustment = if thread_state.upmixer.options.loud {
                         thread_state.upmixer.options.matrix.amplitude_adjustment()
                     } else {
-                        1.0f32
+                        1.0f64
                     };
 
                     let left_amplitude = left_amplitude / amplitude_adjustment;
@@ -321,9 +321,9 @@ impl PannerAndWriter {
 
                             // Subtract the center from the right and left front channels
                             left_front_amplitude =
-                                f32::max(0.0, left_front_amplitude - center_amplitude);
+                                f64::max(0.0, left_front_amplitude - center_amplitude);
                             right_front_amplitude =
-                                f32::max(0.0, right_front_amplitude - center_amplitude);
+                                f64::max(0.0, right_front_amplitude - center_amplitude);
 
                             Some(center)
                         }
@@ -475,12 +475,12 @@ impl PannerAndWriter {
         upmixer: &Upmixer,
         sample_ctr: usize,
         sample_in_transform: usize,
-        left_front: &Vec<Complex<f32>>,
-        right_front: &Vec<Complex<f32>>,
-        left_rear: &Vec<Complex<f32>>,
-        right_rear: &Vec<Complex<f32>>,
-        lfe: &Option<Vec<Complex<f32>>>,
-        center: &Option<Vec<Complex<f32>>>,
+        left_front: &Vec<Complex<f64>>,
+        right_front: &Vec<Complex<f64>>,
+        left_rear: &Vec<Complex<f64>>,
+        right_rear: &Vec<Complex<f64>>,
+        lfe: &Option<Vec<Complex<f64>>>,
+        center: &Option<Vec<Complex<f64>>>,
     ) -> Result<()> {
         let gain = db_to_amplitude(0f32 - upmixer.options.headroom.unwrap_or(0.0));
 
@@ -505,10 +505,10 @@ impl PannerAndWriter {
         };
 
         let mut samples_by_channel = SamplesByChannel::new()
-            .front_left((upmixer.scale * left_front_sample * gain) as f32)
-            .front_right((upmixer.scale * right_front_sample * gain) as f32)
-            .back_left((upmixer.scale * left_rear_sample * gain) as f32)
-            .back_right((upmixer.scale * right_rear_sample * gain) as f32);
+            .front_left(upmixer.scale * left_front_sample * gain as f64)
+            .front_right(upmixer.scale * right_front_sample * gain as f64)
+            .back_left(upmixer.scale * left_rear_sample * gain as f64)
+            .back_right(upmixer.scale * right_rear_sample * gain as f64);
 
         match lfe_sample {
             Some(lfe_sample) => {
@@ -528,11 +528,34 @@ impl PannerAndWriter {
         let sample_ctr_in_file = sample_ctr - (self.max_samples_in_file * out_file_index);
 
         writer_state.target_random_access_wav_writers[out_file_index]
-            .write_samples(sample_ctr_in_file, samples_by_channel)?;
+            .write_samples(sample_ctr_in_file, f64_to_f32(samples_by_channel))?;
 
         writer_state.total_samples_written += 1;
 
         Ok(())
+    }
+}
+
+pub fn f64_to_f32(samples: SamplesByChannel<f64>) -> SamplesByChannel<f32> {
+    SamplesByChannel {
+        front_left_of_center: None,
+        front_right_of_center: None,
+        back_center: None,
+        side_left: None,
+        side_right: None,
+        top_center: None,
+        top_front_left: None,
+        top_front_center: None,
+        top_front_right: None,
+        top_back_left: None,
+        top_back_center: None,
+        top_back_right: None,
+        front_left: samples.front_left.map(|x| x as f32),
+        front_right: samples.front_right.map(|x| x as f32),
+        front_center: samples.front_center.map(|x| x as f32),
+        back_left: samples.back_left.map(|x| x as f32),
+        back_right: samples.back_right.map(|x| x as f32),
+        low_frequency: samples.low_frequency.map(|x| x as f32),
     }
 }
 

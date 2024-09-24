@@ -1,9 +1,9 @@
 use std::{
     cell::Cell,
-    f32::consts::{PI, TAU},
+    f64::consts::{PI, TAU},
 };
 
-const HALF_PI: f32 = PI / 2.0;
+const HALF_PI: f64 = PI / 2.0;
 
 use rustfft::num_complex::Complex;
 
@@ -14,37 +14,37 @@ use crate::structs::FrequencyPans;
 // (Based on https://music.arts.uci.edu/dobrian/maxcookbook/constant-power-panning-using-square-root-intensity)
 // Thus, if a tone has a 1.0 amplitude in both speakers, its real amplitude is 1.414213562373094
 // Items panned to the center are usually lowered by 0.707106781186548 in order to be the same volume as when panned to the edge
-pub const CENTER_AMPLITUDE_ADJUSTMENT: f32 = 0.707106781186548; // 2.0.sqrt() / 2.0;
+pub const CENTER_AMPLITUDE_ADJUSTMENT: f64 = 0.707106781186548; // 2.0.sqrt() / 2.0;
 
 pub trait Matrix {
     fn steer(
         &self,
-        left_amplitude: f32,
-        left_phase: f32,
-        right_amplitude: f32,
-        right_phase: f32,
+        left_amplitude: f64,
+        left_phase: f64,
+        right_amplitude: f64,
+        right_phase: f64,
     ) -> FrequencyPans;
 
     fn phase_shift(
         &self,
-        left_front_phase: &mut f32,
-        right_front_phase: &mut f32,
-        left_rear_phase: &mut f32,
-        right_rear_phase: &mut f32,
+        left_front_phase: &mut f64,
+        right_front_phase: &mut f64,
+        left_rear_phase: &mut f64,
+        right_rear_phase: &mut f64,
     );
 
     fn print_debugging_information(&self);
 
-    fn amplitude_adjustment(&self) -> f32;
+    fn amplitude_adjustment(&self) -> f64;
 
     fn steer_right_left(&self) -> bool;
 }
 
 pub struct DefaultMatrix {
-    widen_factor: f32,
-    left_rear_shift: f32,
-    right_rear_shift: f32,
-    rear_adjustment: f32,
+    widen_factor: f64,
+    left_rear_shift: f64,
+    right_rear_shift: f64,
+    rear_adjustment: f64,
 }
 
 // Note that it is intended that DefaultMatrix can be configured to support the old quad matrixes
@@ -84,7 +84,7 @@ impl DefaultMatrix {
             widen_factor: 1.0,
             left_rear_shift: -0.5 * PI,
             right_rear_shift: 0.5 * PI,
-            rear_adjustment: 2.0f32.sqrt(),
+            rear_adjustment: 2.0f64.sqrt(),
         }
     }
 }
@@ -92,10 +92,10 @@ impl DefaultMatrix {
 impl Matrix for DefaultMatrix {
     fn steer(
         &self,
-        left_amplitude: f32,
-        left_phase: f32,
-        right_amplitude: f32,
-        right_phase: f32,
+        left_amplitude: f64,
+        left_phase: f64,
+        right_amplitude: f64,
+        right_phase: f64,
     ) -> FrequencyPans {
         // Will range from 0 to tau
         // 0 is in phase, pi is out of phase, tau is in phase (think circle)
@@ -154,10 +154,10 @@ impl Matrix for DefaultMatrix {
 
     fn phase_shift(
         &self,
-        _left_front_phase: &mut f32,
-        _right_front_phase: &mut f32,
-        left_rear_phase: &mut f32,
-        right_rear_phase: &mut f32,
+        _left_front_phase: &mut f64,
+        _right_front_phase: &mut f64,
+        left_rear_phase: &mut f64,
+        right_rear_phase: &mut f64,
     ) {
         shift_in_place(left_rear_phase, self.left_rear_shift);
         shift_in_place(right_rear_phase, self.right_rear_shift);
@@ -165,7 +165,7 @@ impl Matrix for DefaultMatrix {
 
     fn print_debugging_information(&self) {}
 
-    fn amplitude_adjustment(&self) -> f32 {
+    fn amplitude_adjustment(&self) -> f64 {
         CENTER_AMPLITUDE_ADJUSTMENT
     }
 
@@ -175,10 +175,10 @@ impl Matrix for DefaultMatrix {
 }
 
 // https://en.wikipedia.org/wiki/Stereo_Quadraphonic
-//const SQ_LOWER: f32 = 0.7;
-const SQ_RAISE: f32 = 1.0 / 0.7;
-const SQ_LEFT_REAR_SHIFT: f32 = PI / 2.0;
-const SQ_RIGHT_REAR_SHIFT: f32 = SQ_LEFT_REAR_SHIFT * -1.0;
+//const SQ_LOWER: f64 = 0.7;
+const SQ_RAISE: f64 = 1.0 / 0.7;
+const SQ_LEFT_REAR_SHIFT: f64 = PI / 2.0;
+const SQ_RIGHT_REAR_SHIFT: f64 = SQ_LEFT_REAR_SHIFT * -1.0;
 
 // Uses the Soft Matrix approach of closely inspecting phase and amplitude, but it doesn't work very well
 pub struct SQMatrix {}
@@ -192,10 +192,10 @@ impl SQMatrix {
 impl Matrix for SQMatrix {
     fn steer(
         &self,
-        left_total_amplitude: f32,
-        left_phase: f32,
-        right_total_amplitude: f32,
-        right_phase: f32,
+        left_total_amplitude: f64,
+        left_phase: f64,
+        right_total_amplitude: f64,
+        right_phase: f64,
     ) -> FrequencyPans {
         /*
 
@@ -305,8 +305,8 @@ impl Matrix for SQMatrix {
                 back_to_front: 0.0,
             };
         } else {
-            let left_to_right: f32;
-            let back_to_front: f32;
+            let left_to_right: f64;
+            let back_to_front: f64;
 
             if phase_difference < 0.0 && phase_difference > (-1.0 * HALF_PI) {
                 // Right-isolated, front -> back pan comes from phase
@@ -347,10 +347,10 @@ impl Matrix for SQMatrix {
 
     fn phase_shift(
         &self,
-        _left_front_phase: &mut f32,
-        _right_front_phase: &mut f32,
-        left_rear_phase: &mut f32,
-        right_rear_phase: &mut f32,
+        _left_front_phase: &mut f64,
+        _right_front_phase: &mut f64,
+        left_rear_phase: &mut f64,
+        right_rear_phase: &mut f64,
     ) {
         shift_in_place(left_rear_phase, SQ_LEFT_REAR_SHIFT);
         shift_in_place(right_rear_phase, SQ_RIGHT_REAR_SHIFT);
@@ -358,7 +358,7 @@ impl Matrix for SQMatrix {
 
     fn print_debugging_information(&self) {}
 
-    fn amplitude_adjustment(&self) -> f32 {
+    fn amplitude_adjustment(&self) -> f64 {
         CENTER_AMPLITUDE_ADJUSTMENT
     }
 
@@ -371,19 +371,19 @@ impl Matrix for SQMatrix {
 // Doesn't work very well
 
 pub struct SQMatrixExperimental {
-    min_back_to_front: Cell<f32>,
-    max_back_to_front: Cell<f32>,
-    min_left_to_right: Cell<f32>,
-    max_left_to_right: Cell<f32>,
+    min_back_to_front: Cell<f64>,
+    max_back_to_front: Cell<f64>,
+    min_left_to_right: Cell<f64>,
+    max_left_to_right: Cell<f64>,
 }
 
 impl SQMatrixExperimental {
     pub fn sq() -> SQMatrixExperimental {
         SQMatrixExperimental {
-            min_back_to_front: Cell::new(f32::INFINITY),
-            max_back_to_front: Cell::new(f32::NEG_INFINITY),
-            min_left_to_right: Cell::new(f32::INFINITY),
-            max_left_to_right: Cell::new(f32::NEG_INFINITY),
+            min_back_to_front: Cell::new(f64::INFINITY),
+            max_back_to_front: Cell::new(f64::NEG_INFINITY),
+            min_left_to_right: Cell::new(f64::INFINITY),
+            max_left_to_right: Cell::new(f64::NEG_INFINITY),
         }
     }
 }
@@ -391,10 +391,10 @@ impl SQMatrixExperimental {
 impl Matrix for SQMatrixExperimental {
     fn steer(
         &self,
-        left_total_amplitude: f32,
-        left_phase: f32,
-        right_total_amplitude: f32,
-        right_phase: f32,
+        left_total_amplitude: f64,
+        left_phase: f64,
+        right_total_amplitude: f64,
+        right_phase: f64,
     ) -> FrequencyPans {
         let amplitude_sum = left_total_amplitude + right_total_amplitude;
 
@@ -507,10 +507,10 @@ impl Matrix for SQMatrixExperimental {
 
     fn phase_shift(
         &self,
-        _left_front_phase: &mut f32,
-        _right_front_phase: &mut f32,
-        left_rear_phase: &mut f32,
-        right_rear_phase: &mut f32,
+        _left_front_phase: &mut f64,
+        _right_front_phase: &mut f64,
+        left_rear_phase: &mut f64,
+        right_rear_phase: &mut f64,
     ) {
         shift_in_place(left_rear_phase, SQ_LEFT_REAR_SHIFT);
         shift_in_place(right_rear_phase, SQ_RIGHT_REAR_SHIFT);
@@ -529,7 +529,7 @@ impl Matrix for SQMatrixExperimental {
         */
     }
 
-    fn amplitude_adjustment(&self) -> f32 {
+    fn amplitude_adjustment(&self) -> f64 {
         CENTER_AMPLITUDE_ADJUSTMENT
     }
 
@@ -538,18 +538,18 @@ impl Matrix for SQMatrixExperimental {
     }
 }
 
-fn shift(phase: f32, shift: f32) -> f32 {
+fn shift(phase: f64, shift: f64) -> f64 {
     let mut phase_mut = phase;
     shift_in_place(&mut phase_mut, shift);
     phase_mut
 }
 
-fn shift_in_place(phase: &mut f32, shift: f32) {
+fn shift_in_place(phase: &mut f64, shift: f64) {
     *phase += shift;
     bring_phase_in_range(phase);
 }
 
-fn bring_phase_in_range(phase: &mut f32) {
+fn bring_phase_in_range(phase: &mut f64) {
     if *phase > PI {
         *phase -= TAU;
     } else if *phase < -PI {

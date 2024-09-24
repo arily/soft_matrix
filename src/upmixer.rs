@@ -23,7 +23,7 @@ pub struct Upmixer {
     pub window_size: usize,
     pub window_midpoint: usize,
     pub total_samples_to_write: usize,
-    pub scale: f32,
+    pub scale: f64,
 
     // Handles periodic logging to the console
     pub logger: Logger,
@@ -97,14 +97,14 @@ pub fn upmix<TReader: 'static + Read + Seek>(
 
     // rustfft states that the scale is 1/len()
     // See "noramlization": https://docs.rs/rustfft/latest/rustfft/#normalization
-    let scale: f32 = 1.0 / (window_size as f32);
+    let scale: f64 = 1.0 / (window_size as f64);
 
     let window_midpoint = window_size / 2;
 
     let total_samples_to_write = source_wav_reader.info().len_samples();
     let sample_rate = source_wav_reader.info().sample_rate() as usize;
 
-    let mut planner = FftPlanner::new();
+    let mut planner: FftPlanner<f64> = FftPlanner::new();
     let fft_forward = planner.plan_fft_forward(window_size);
     let fft_inverse = planner.plan_fft_inverse(window_size);
 
@@ -128,7 +128,7 @@ pub fn upmix<TReader: 'static + Read + Seek>(
         window_size,
         window_midpoint,
         scale,
-        logger: Logger::new(Duration::from_secs_f32(1.0 / 10.0), total_samples_to_write),
+        logger: Logger::new(Duration::from_secs_f64(1.0 / 10.0), total_samples_to_write),
         reader,
         panning_averager: PanningAverager::new(window_size),
         panner_and_writer,
@@ -163,15 +163,15 @@ impl Upmixer {
         // Each thread has a separate FFT scratch space
         let scratch_forward = vec![
             Complex {
-                re: 0.0f32,
-                im: 0.0f32
+                re: 0.0f64,
+                im: 0.0f64
             };
             self.reader.get_inplace_scratch_len()
         ];
         let scratch_inverse = vec![
             Complex {
-                re: 0.0f32,
-                im: 0.0f32
+                re: 0.0f64,
+                im: 0.0f64
             };
             self.panner_and_writer.get_inplace_scratch_len()
         ];

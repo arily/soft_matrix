@@ -17,7 +17,7 @@ struct EnqueueAndAverageState {
     // Precalculated indexes and fractions used to calculate rolling averages of samples
     pub average_last_sample_ctr_lower_bounds: Vec<usize>,
     pub average_last_sample_ctr_upper_bounds: Vec<usize>,
-    pub pan_fraction_per_frequencies: Vec<f32>,
+    pub pan_fraction_per_frequencies: Vec<f64>,
     // Indexes of samples to average
     pub next_last_sample_ctr_to_enqueue: usize,
     // A queue of transformed windows and all of the panned locations of each frequency, before averaging
@@ -46,7 +46,7 @@ impl PanningAverager {
             let average_last_sample_ctr_lower_bound = extra_samples / 2;
             let average_last_sample_ctr_upper_bound =
                 average_last_sample_ctr_lower_bound + wavelength - 1;
-            let pan_fraction_per_frequency = 1.0 / (wavelength as f32);
+            let pan_fraction_per_frequency = 1.0f64 / (wavelength as f64);
 
             average_last_sample_ctr_lower_bounds.push(average_last_sample_ctr_lower_bound);
             average_last_sample_ctr_upper_bounds.push(average_last_sample_ctr_upper_bound);

@@ -8,23 +8,23 @@ use rustfft::{num_complex::Complex, Fft};
 use wave_stream::wave_reader::{StreamWavReader, StreamWavReaderIterator};
 
 use crate::{
-    options::Options,
+    options::{db_to_amplitude, Options},
     structs::{ThreadState, TransformedWindowAndPans},
     vecdeque_ext::VecDequeExt,
 };
 
 pub struct Reader {
     open_wav_reader_and_buffer: Mutex<OpenWavReaderAndBuffer>,
-    fft_forward: Arc<dyn Fft<f32>>,
+    fft_forward: Arc<dyn Fft<f64>>,
 }
 
 // Allows wrapping information about reading the wav into a single mutex
 struct OpenWavReaderAndBuffer {
     stream_wav_reader_iterator: StreamWavReaderIterator<f32>,
     total_samples_read: usize,
-    left_buffer: VecDeque<Complex<f32>>,
-    right_buffer: VecDeque<Complex<f32>>,
-    mono_buffer: VecDeque<Complex<f32>>,
+    left_buffer: VecDeque<Complex<f64>>,
+    right_buffer: VecDeque<Complex<f64>>,
+    mono_buffer: VecDeque<Complex<f64>>,
 }
 
 impl Reader {
@@ -32,7 +32,7 @@ impl Reader {
         options: &Options,
         stream_wav_reader: StreamWavReader<f32>,
         window_size: usize,
-        fft_forward: Arc<dyn Fft<f32>>,
+        fft_forward: Arc<dyn Fft<f64>>,
     ) -> Result<Reader> {
         let mut open_wav_reader_and_buffer = OpenWavReaderAndBuffer {
             stream_wav_reader_iterator: stream_wav_reader.into_iter(),
@@ -60,9 +60,9 @@ impl Reader {
         self: &Reader,
         thread_state: &mut ThreadState,
     ) -> Result<Option<TransformedWindowAndPans>> {
-        let mut left_transformed: Vec<Complex<f32>>;
-        let mut right_transformed: Vec<Complex<f32>>;
-        let mut mono_transformed: Option<Vec<Complex<f32>>>;
+        let mut left_transformed: Vec<Complex<f64>>;
+        let mut right_transformed: Vec<Complex<f64>>;
+        let mut mono_transformed: Option<Vec<Complex<f64>>>;
         let last_sample_ctr: usize;
         {
             let mut open_wav_reader_and_buffer = self
@@ -120,12 +120,32 @@ impl Reader {
             let (left_amplitude, mut left_phase) = left_transformed[freq_ctr].to_polar();
             let (right_amplitude, mut right_phase) = right_transformed[freq_ctr].to_polar();
 
-            if left_amplitude < thread_state.upmixer.options.minimum_steered_amplitude
-                && right_amplitude >= thread_state.upmixer.options.minimum_steered_amplitude
+            if left_amplitude
+                < thread_state
+                    .upmixer
+                    .options
+                    .minimum_steered_amplitude
+                    .into()
+                && right_amplitude
+                    >= thread_state
+                        .upmixer
+                        .options
+                        .minimum_steered_amplitude
+                        .into()
             {
                 left_phase = right_phase;
-            } else if left_amplitude >= thread_state.upmixer.options.minimum_steered_amplitude
-                && right_amplitude < thread_state.upmixer.options.minimum_steered_amplitude
+            } else if left_amplitude
+                >= thread_state
+                    .upmixer
+                    .options
+                    .minimum_steered_amplitude
+                    .into()
+                && right_amplitude
+                    < thread_state
+                        .upmixer
+                        .options
+                        .minimum_steered_amplitude
+                        .into()
             {
                 right_phase = left_phase
             }
@@ -167,32 +187,33 @@ impl Reader {
 
 impl OpenWavReaderAndBuffer {
     fn queue_next_sample(&mut self, options: &Options) -> Result<()> {
-        let headroom = db_to_amplitude(options.headroom.unwrap_or(0.0));
+        let headroom: f64 = db_to_amplitude(options.headroom.unwrap_or(0.0)).into();
         match self.stream_wav_reader_iterator.next() {
             Some(samples_result) => {
                 let samples = samples_result?;
 
-                let front_left =
-                    samples.front_left.expect("front_left missing when reading") * headroom;
+                let front_left: f64 =
+                    samples.front_left.expect("front_left missing when reading") as f64 * headroom;
                 let front_right = samples
                     .front_right
                     .expect("front_right missing when reading")
+                    as f64
                     * headroom;
 
                 self.left_buffer.push_back(Complex {
                     re: front_left,
-                    im: 0.0f32,
+                    im: 0.0f64,
                 });
 
                 self.right_buffer.push_back(Complex {
                     re: front_right,
-                    im: 0.0f32,
+                    im: 0.0f64,
                 });
 
                 if options.transform_mono {
                     self.mono_buffer.push_back(Complex {
-                        re: (front_left + front_right) / 2.0,
-                        im: 0.0f32,
+                        re: (front_left + front_right) / 2.0f64,
+                        im: 0.0f64,
                     });
                 }
             }
@@ -205,18 +226,18 @@ impl OpenWavReaderAndBuffer {
                 // https://github.com/GWBasic/soft_matrix/issues/24
 
                 self.left_buffer.push_back(Complex {
-                    re: 0.0f32,
-                    im: 0.0f32,
+                    re: 0.0f64,
+                    im: 0.0f64,
                 });
                 self.right_buffer.push_back(Complex {
-                    re: 0.0f32,
-                    im: 0.0f32,
+                    re: 0.0f64,
+                    im: 0.0f64,
                 });
 
                 if options.transform_mono {
                     self.mono_buffer.push_back(Complex {
-                        re: 0.0f32,
-                        im: 0.0f32,
+                        re: 0.0f64,
+                        im: 0.0f64,
                     });
                 }
             }

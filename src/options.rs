@@ -311,7 +311,7 @@ impl Options {
                         MatrixFormat::SQExperimental => Box::new(SQMatrixExperimental::sq()),
                     };
 
-                    if (low_frequency as f32) > panner_and_writer::LFE_START
+                    if (low_frequency as f64) > panner_and_writer::LFE_START
                         && channels.low_frequency
                     {
                         println!(
